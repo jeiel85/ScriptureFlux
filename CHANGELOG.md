@@ -2,6 +2,10 @@
 
 ## Unreleased - 2026-05-22
 
+### Performance
+- `NetworkCanvas`에 `OffscreenCanvas` 우선 백버퍼를 도입해 정적 배경 네트워크를 캐싱하고, hover/focus/pin 변경 시에는 캐시된 배경 위에 active/pinned 링크만 덧그리도록 렌더링 경로를 분리했습니다.
+- 데이터셋 안에 잘못된 책 인덱스나 장/절 값이 섞여 있어도 렌더링 전체가 중단되지 않도록 유효하지 않은 교차 참조 튜플을 방어적으로 제외합니다.
+
 ### Fixed
 - `NetworkCanvas`의 책별 세부 교차 참조 lazy loading 로직에서 남아 있던 React Hooks 의존성 경고를 제거했습니다.
 - 중복 fetch 방지 상태를 `ref` 기반으로 정리해 렌더링과 무관한 로딩 추적이 불필요한 재렌더를 만들지 않도록 보강했습니다.
@@ -11,6 +15,7 @@
 - `npm run typecheck`: 무오류 통과
 - `npm run test`: 1개 테스트 파일, 4개 테스트 통과
 - `npm run build`: dist 정적 SPA 빌드 성공
+- Playwright CLI + Edge headless: 로컬 dev 서버에서 페이지 오류 없이 캔버스 생성 및 네트워크 렌더링 확인
 
 ---
 

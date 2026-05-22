@@ -40,6 +40,28 @@ interface NetworkCanvasProps {
 const PADDING_X = 60;
 const AXIS_Y_OFFSET = 80; // 하단 여백 (축 렌더링 공간)
 
+type CanvasBuffer = OffscreenCanvas | HTMLCanvasElement;
+type CanvasContext2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
+function createCanvasBuffer(width: number, height: number): CanvasBuffer {
+  if (typeof OffscreenCanvas !== 'undefined') {
+    return new OffscreenCanvas(width, height);
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+function drawBezierPath(ctx: CanvasContext2D, link: RenderLink) {
+  const h = getBezierHeight(link.x0, link.x1);
+  ctx.beginPath();
+  ctx.moveTo(link.x0, link.y0);
+  ctx.bezierCurveTo(link.x0, link.y0 - h, link.x1, link.y1 - h, link.x1, link.y1);
+  ctx.stroke();
+}
+
 export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
   activeLink,
   setActiveLink,
@@ -57,9 +79,12 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
   const mouseRef = useRef<{ x: number; y: number } | null>(null);
   const rAFRef = useRef<number | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const backgroundLayerRef = useRef<CanvasBuffer | null>(null);
+  const [backgroundVersion, setBackgroundVersion] = useState(0);
 
   // 0. 접근성 및 키보드 상태 선언
   const [isFocused, setIsFocused] = useState(false);
+  const [hoveredBookIndex, setHoveredBookIndex] = useState<number | null>(null);
 
   // LOD(Level of Detail) 2단계 레이지 로딩 상태
   const [initialLinks, setInitialLinks] = useState<number[][]>([]);
@@ -180,14 +205,32 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
   const allLinks = useMemo<RenderLink[]>(() => {
     const yCoord = dimensions.height - AXIS_Y_OFFSET;
 
-    return combinedReferences.map((tuple, index) => {
+    return combinedReferences.flatMap((tuple, index) => {
       const [srcBook, srcCh, srcVs, tgtBook, tgtCh, tgtVs, weight] = tuple;
+
+      if (
+        srcBook < 0 ||
+        srcBook >= books.length ||
+        tgtBook < 0 ||
+        tgtBook >= books.length ||
+        !verseIndex.books[srcBook] ||
+        !verseIndex.books[tgtBook]
+      ) {
+        return [];
+      }
       
       const sourceRef = { bookIndex: srcBook, chapter: srcCh, verse: srcVs };
       const targetRef = { bookIndex: tgtBook, chapter: tgtCh, verse: tgtVs };
 
-      const sourceOffset = toGlobalVerseOffset(sourceRef, verseIndex);
-      const targetOffset = toGlobalVerseOffset(targetRef, verseIndex);
+      let sourceOffset: number;
+      let targetOffset: number;
+
+      try {
+        sourceOffset = toGlobalVerseOffset(sourceRef, verseIndex);
+        targetOffset = toGlobalVerseOffset(targetRef, verseIndex);
+      } catch {
+        return [];
+      }
 
       const x0 = xScale(sourceOffset);
       const x1 = xScale(targetOffset);
@@ -202,7 +245,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
       else if (srcTestament === 'OT' && tgtTestament === 'NT') testamentClass = 'OT_TO_NT';
       else if (srcTestament === 'NT' && tgtTestament === 'OT') testamentClass = 'NT_TO_OT';
 
-      return {
+      return [{
         id: index,
         source: sourceRef,
         target: targetRef,
@@ -214,7 +257,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
         y1: yCoord,
         weight,
         testamentClass,
-      };
+      }];
     });
   }, [combinedReferences, dimensions.height, xScale]);
 
@@ -292,7 +335,153 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
   }, [allLinks, initialPinnedRefs, loadBookDetails, setActiveLink, setInitialPinnedRefs, setPinnedLink]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // 5. Canvas 고해상도 렌더링 & 애니메이션 루프
+  const getTargetDpr = useCallback(() => {
+    const dpr = window.devicePixelRatio || 1;
+    const isMobile = dimensions.width < 768;
+    return isMobile ? Math.min(1.5, dpr) : dpr;
+  }, [dimensions.width]);
+
+  const getBookIndexAtCoordinates = useCallback((x: number, y: number) => {
+    const axisY = dimensions.height - AXIS_Y_OFFSET;
+    if (y < axisY - 10 || y > axisY + 30) return null;
+
+    return verseIndex.books.findIndex((bookMeta) => {
+      const startX = xScale(bookMeta.startVerseOffset);
+      const endX = xScale(bookMeta.startVerseOffset + bookMeta.verseCount);
+      return x >= startX && x <= endX;
+    });
+  }, [dimensions.height, xScale]);
+
+  const drawStaticLayer = useCallback((ctx: CanvasContext2D, isMobile: boolean) => {
+    ctx.clearRect(0, 0, dimensions.width, dimensions.height);
+
+    const axisY = dimensions.height - AXIS_Y_OFFSET;
+    const currentSearchVerse = searchVerse;
+    const hasSearch = currentSearchVerse !== null;
+
+    // 5-1. 성경 66권 축 및 경계 렌더링
+    books.forEach((book, i) => {
+      const bookMeta = verseIndex.books[i];
+      const startX = xScale(bookMeta.startVerseOffset);
+      const endX = xScale(bookMeta.startVerseOffset + bookMeta.verseCount);
+      const width = endX - startX;
+
+      // 구약과 신약의 테마 컬러 설정 (Tailwind 브랜드 색상과 매핑)
+      const isOT = book.testament === 'OT';
+      const color = isOT ? 'rgba(59, 130, 246, 0.4)' : 'rgba(236, 72, 153, 0.4)';
+      const hoverColor = isOT ? 'rgba(59, 130, 246, 0.7)' : 'rgba(236, 72, 153, 0.7)';
+      const isBookHovered = hoveredBookIndex === i;
+
+      // 바(Bar) 렌더링
+      ctx.fillStyle = isBookHovered ? hoverColor : color;
+      ctx.fillRect(startX, axisY, width, 12);
+
+      // 경계 수직선
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(startX, axisY);
+      ctx.lineTo(startX, axisY + 25);
+      ctx.stroke();
+
+      // 텍스트 라벨 (간격을 두고 겹치지 않게 표시하거나 크기에 맞춰 렌더링)
+      const textWidth = ctx.measureText(book.ko).width;
+      const skipLabel = isMobile ? (i % 6 === 0) : (i % 3 === 0);
+
+      if (width > textWidth + 4 || (skipLabel && width > 10)) {
+        ctx.fillStyle = isBookHovered ? '#ffffff' : 'rgba(156, 163, 175, 0.7)';
+        ctx.font = isMobile ? '8px sans-serif' : '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(book.ko, startX + width / 2, axisY + 26);
+      }
+    });
+
+    // 5-2. 기본 백그라운드 네트워크 곡선 그리기 (faint alpha, no glow)
+    ctx.shadowBlur = 0; // 최적화: glow 제거
+    ctx.lineWidth = isMobile ? 0.5 : 0.75;
+
+    filteredLinks.forEach((link) => {
+      // 검색 상태일 때 해당 링크가 검색 구절에 매칭되는지 확인
+      const isSourceMatch = hasSearch &&
+        link.source.bookIndex === currentSearchVerse.bookIndex &&
+        link.source.chapter === currentSearchVerse.chapter &&
+        link.source.verse === currentSearchVerse.verse;
+      const isTargetMatch = hasSearch &&
+        link.target.bookIndex === currentSearchVerse.bookIndex &&
+        link.target.chapter === currentSearchVerse.chapter &&
+        link.target.verse === currentSearchVerse.verse;
+
+      if (isSourceMatch || isTargetMatch) {
+        // 매칭된 검색 결과 링크는 아래 하이라이트 패스에서 덧그림
+        return;
+      }
+
+      // 구신약별 곡선 컬러 (검색 활성화 상태라면 비매칭 선들을 어둡게 Dimming)
+      const strokeColor = hasSearch
+        ? 'rgba(255, 255, 255, 0.015)' // 극도의 Dimming
+        : link.testamentClass === 'OT_TO_OT'
+        ? 'rgba(59, 130, 246, 0.08)'
+        : link.testamentClass === 'NT_TO_NT'
+        ? 'rgba(236, 72, 153, 0.08)'
+        : 'rgba(16, 185, 129, 0.12)';
+
+      ctx.strokeStyle = strokeColor;
+      drawBezierPath(ctx, link);
+    });
+
+    // 5-2-2. 검색 매칭 링크 하이라이트 덧그리기 (Glow 적용)
+    if (hasSearch) {
+      filteredLinks.forEach((link) => {
+        const isSourceMatch =
+          link.source.bookIndex === currentSearchVerse.bookIndex &&
+          link.source.chapter === currentSearchVerse.chapter &&
+          link.source.verse === currentSearchVerse.verse;
+        const isTargetMatch =
+          link.target.bookIndex === currentSearchVerse.bookIndex &&
+          link.target.chapter === currentSearchVerse.chapter &&
+          link.target.verse === currentSearchVerse.verse;
+
+        if (!isSourceMatch && !isTargetMatch) return;
+
+        ctx.save();
+        // Glow 효과와 선명한 에메랄드 그린선
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#10b981';
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = isMobile ? 1.2 : 1.8;
+        drawBezierPath(ctx, link);
+
+        // 양 앵커에 작은 점 표시
+        ctx.fillStyle = '#10b981';
+        ctx.shadowBlur = 5;
+        ctx.beginPath();
+        ctx.arc(link.x0, link.y0, 2.5, 0, Math.PI * 2);
+        ctx.arc(link.x1, link.y1, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+  }, [dimensions.height, dimensions.width, filteredLinks, hoveredBookIndex, searchVerse, xScale]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  // 5. OffscreenCanvas 우선 백버퍼에 정적 배경 네트워크를 캐싱한다.
+  useEffect(() => {
+    const targetDpr = getTargetDpr();
+    const physicalWidth = Math.floor(dimensions.width * targetDpr);
+    const physicalHeight = Math.floor(dimensions.height * targetDpr);
+    const backgroundLayer = createCanvasBuffer(physicalWidth, physicalHeight);
+    const backgroundCtx = backgroundLayer.getContext('2d') as CanvasContext2D | null;
+
+    if (!backgroundCtx) return;
+
+    backgroundCtx.setTransform(targetDpr, 0, 0, targetDpr, 0, 0);
+    drawStaticLayer(backgroundCtx, dimensions.width < 768);
+    backgroundLayerRef.current = backgroundLayer;
+    setBackgroundVersion((version) => version + 1);
+  }, [dimensions, drawStaticLayer, getTargetDpr]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // 5-1. foreground 캔버스는 캐시된 배경을 복사하고 active/pinned 링크만 덧그린다.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -300,180 +489,31 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const isMobile = dimensions.width < 768;
-    const targetDpr = isMobile ? Math.min(1.5, dpr) : dpr;
+    const targetDpr = getTargetDpr();
+    canvas.width = Math.floor(dimensions.width * targetDpr);
+    canvas.height = Math.floor(dimensions.height * targetDpr);
+    ctx.setTransform(targetDpr, 0, 0, targetDpr, 0, 0);
+    ctx.clearRect(0, 0, dimensions.width, dimensions.height);
 
-    canvas.width = dimensions.width * targetDpr;
-    canvas.height = dimensions.height * targetDpr;
-    ctx.scale(targetDpr, targetDpr);
-
-    const draw = () => {
-      // 캔버스 초기화
-      ctx.clearRect(0, 0, dimensions.width, dimensions.height);
-
-      const axisY = dimensions.height - AXIS_Y_OFFSET;
-
-      // 5-1. 성경 66권 축 및 경계 렌더링
-      books.forEach((book, i) => {
-        const bookMeta = verseIndex.books[i];
-        const startX = xScale(bookMeta.startVerseOffset);
-        const endX = xScale(bookMeta.startVerseOffset + bookMeta.verseCount);
-        const width = endX - startX;
-
-        // 구약과 신약의 테마 컬러 설정 (Tailwind 브랜드 색상과 매핑)
-        const isOT = book.testament === 'OT';
-        const color = isOT ? 'rgba(59, 130, 246, 0.4)' : 'rgba(236, 72, 153, 0.4)';
-        const hoverColor = isOT ? 'rgba(59, 130, 246, 0.7)' : 'rgba(236, 72, 153, 0.7)';
-
-        // Hover 책 판단 및 동적 레이지 로드 트리거
-        let isBookHovered = false;
-        if (mouseRef.current) {
-          const { x, y } = mouseRef.current;
-          if (x >= startX && x <= endX && y >= axisY - 10 && y <= axisY + 30) {
-            isBookHovered = true;
-            // 캔버스 내 책 영역에 마우스가 호버되면 즉시 해당 책의 세부 참조 페치
-            loadBookDetails(i);
-          }
-        }
-
-        // 바(Bar) 렌더링
-        ctx.fillStyle = isBookHovered ? hoverColor : color;
-        ctx.fillRect(startX, axisY, width, 12);
-
-        // 경계 수직선
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(startX, axisY);
-        ctx.lineTo(startX, axisY + 25);
-        ctx.stroke();
-
-        // 텍스트 라벨 (간격을 두고 겹치지 않게 표시하거나 크기에 맞춰 렌더링)
-        const textWidth = ctx.measureText(book.ko).width;
-        const skipLabel = isMobile ? (i % 6 === 0) : (i % 3 === 0);
-
-        if (width > textWidth + 4 || (skipLabel && width > 10)) {
-          ctx.fillStyle = isBookHovered ? '#ffffff' : 'rgba(156, 163, 175, 0.7)';
-          ctx.font = isMobile ? '8px sans-serif' : '10px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(book.ko, startX + width / 2, axisY + 26);
-        }
-      });
-
-      // 5-2. 기본 백그라운드 네트워크 곡선 그리기 (faint alpha, no glow)
-      ctx.shadowBlur = 0; // 최적화: glow 제거
-      ctx.lineWidth = isMobile ? 0.5 : 0.75;
-      
-      const hasSearch = !!searchVerse;
-
-      filteredLinks.forEach((link) => {
-        // Active Link 및 Pinned Link는 나중에 위에 덧그릴 것이므로 스킵
-        if (activeLink && activeLink.id === link.id) return;
-        if (pinnedLink && pinnedLink.id === link.id) return;
-
-        // 검색 상태일 때 해당 링크가 검색 구절에 매칭되는지 확인
-        const isSourceMatch = hasSearch && 
-          link.source.bookIndex === searchVerse.bookIndex && 
-          link.source.chapter === searchVerse.chapter && 
-          link.source.verse === searchVerse.verse;
-        const isTargetMatch = hasSearch && 
-          link.target.bookIndex === searchVerse.bookIndex && 
-          link.target.chapter === searchVerse.chapter && 
-          link.target.verse === searchVerse.verse;
-        
-        if (isSourceMatch || isTargetMatch) {
-          // 매칭된 검색 결과 링크는 나중에 하이라이트로 덧그리기 위해 패스
-          return;
-        }
-
-        // 구신약별 곡선 컬러 (검색 활성화 상태라면 비매칭 선들을 어둡게 Dimming)
-        const strokeColor = hasSearch
-          ? 'rgba(255, 255, 255, 0.015)' // 극도의 Dimming
-          : link.testamentClass === 'OT_TO_OT'
-          ? 'rgba(59, 130, 246, 0.08)'
-          : link.testamentClass === 'NT_TO_NT'
-          ? 'rgba(236, 72, 153, 0.08)'
-          : 'rgba(16, 185, 129, 0.12)';
-
-        ctx.strokeStyle = strokeColor;
-
-        const h = getBezierHeight(link.x0, link.x1);
-        const cp1x = link.x0;
-        const cp1y = link.y0 - h;
-        const cp2x = link.x1;
-        const cp2y = link.y1 - h;
-
-        ctx.beginPath();
-        ctx.moveTo(link.x0, link.y0);
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, link.x1, link.y1);
-        ctx.stroke();
-      });
-
-      // 5-2-2. 검색 매칭 링크 하이라이트 덧그리기 (Glow 적용)
-      if (hasSearch) {
-        filteredLinks.forEach((link) => {
-          if (activeLink && activeLink.id === link.id) return;
-          if (pinnedLink && pinnedLink.id === link.id) return;
-
-          const isSourceMatch = 
-            link.source.bookIndex === searchVerse.bookIndex && 
-            link.source.chapter === searchVerse.chapter && 
-            link.source.verse === searchVerse.verse;
-          const isTargetMatch = 
-            link.target.bookIndex === searchVerse.bookIndex && 
-            link.target.chapter === searchVerse.chapter && 
-            link.target.verse === searchVerse.verse;
-          
-          if (!isSourceMatch && !isTargetMatch) return;
-
-          const h = getBezierHeight(link.x0, link.x1);
-          const cp1x = link.x0;
-          const cp1y = link.y0 - h;
-          const cp2x = link.x1;
-          const cp2y = link.y1 - h;
-
-          ctx.save();
-          // Glow 효과와 선명한 에메랄드 그린선
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = '#10b981';
-          ctx.strokeStyle = '#10b981';
-          ctx.lineWidth = isMobile ? 1.2 : 1.8;
-
-          ctx.beginPath();
-          ctx.moveTo(link.x0, link.y0);
-          ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, link.x1, link.y1);
-          ctx.stroke();
-
-          // 양 앵커에 작은 점 표시
-          ctx.fillStyle = '#10b981';
-          ctx.shadowBlur = 5;
-          ctx.beginPath();
-          ctx.arc(link.x0, link.y0, 2.5, 0, Math.PI * 2);
-          ctx.arc(link.x1, link.y1, 2.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        });
-      }
+    if (backgroundLayerRef.current) {
+      ctx.drawImage(
+        backgroundLayerRef.current as CanvasImageSource,
+        0,
+        0,
+        dimensions.width,
+        dimensions.height
+      );
+    }
 
       // 5-3. 활성화된 단 하나의 링크(Active Link)만 강력하게 강조하여 덧그리기 (Glow 적용)
       if (activeLink && (!pinnedLink || pinnedLink.id !== activeLink.id)) {
-        const h = getBezierHeight(activeLink.x0, activeLink.x1);
-        const cp1x = activeLink.x0;
-        const cp1y = activeLink.y0 - h;
-        const cp2x = activeLink.x1;
-        const cp2y = activeLink.y1 - h;
-
         // 1) Glow 효과를 위한 굵은 섀도우선
         ctx.save();
         ctx.shadowBlur = 15;
         ctx.shadowColor = '#10b981';
         ctx.strokeStyle = '#10b981';
         ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(activeLink.x0, activeLink.y0);
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, activeLink.x1, activeLink.y1);
-        ctx.stroke();
+        drawBezierPath(ctx, activeLink);
 
         // 2) 소스 및 타겟 앵커 서클 렌더링
         ctx.shadowBlur = 10;
@@ -506,22 +546,13 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
 
       // 5-4. 고정된 링크(Pinned Link) 렌더링 (골드/오렌지 네온 하이라이트)
       if (pinnedLink) {
-        const h = getBezierHeight(pinnedLink.x0, pinnedLink.x1);
-        const cp1x = pinnedLink.x0;
-        const cp1y = pinnedLink.y0 - h;
-        const cp2x = pinnedLink.x1;
-        const cp2y = pinnedLink.y1 - h;
-
         // 1) 골드 Glow 효과를 위한 굵은 섀도우선
         ctx.save();
         ctx.shadowBlur = 18;
         ctx.shadowColor = '#f59e0b';
         ctx.strokeStyle = '#f59e0b';
         ctx.lineWidth = 3.5;
-        ctx.beginPath();
-        ctx.moveTo(pinnedLink.x0, pinnedLink.y0);
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, pinnedLink.x1, pinnedLink.y1);
-        ctx.stroke();
+        drawBezierPath(ctx, pinnedLink);
 
         // 2) 소스 및 타겟 앵커 서클 렌더링
         ctx.shadowBlur = 12;
@@ -551,10 +582,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
           pinnedLink.y1 - 15
         );
       }
-    };
-
-    draw();
-  }, [activeLink, dimensions, filteredLinks, loadBookDetails, pinnedLink, searchVerse, xScale]);
+  }, [activeLink, backgroundVersion, dimensions, getTargetDpr, pinnedLink]);
 
   // 6. 120ms 호버 디바운스 기반 pointermove 좌표 감지 연산 (인터랙션 요동 떨림 방지)
   const updateActiveLinkAtCoordinates = (x: number, y: number) => {
@@ -569,6 +597,13 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
 
       const mx = mouseRef.current.x;
       const my = mouseRef.current.y;
+      const hoveredBook = getBookIndexAtCoordinates(mx, my);
+      const nextHoveredBookIndex = hoveredBook === -1 ? null : hoveredBook;
+
+      setHoveredBookIndex(nextHoveredBookIndex);
+      if (nextHoveredBookIndex !== null) {
+        loadBookDetails(nextHoveredBookIndex);
+      }
 
       let foundActiveLink: RenderLink | null = null;
       const isMobile = dimensions.width < 768;
@@ -648,6 +683,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
       cancelAnimationFrame(rAFRef.current);
       rAFRef.current = null;
     }
+    setHoveredBookIndex(null);
     setActiveLink(null);
   };
 

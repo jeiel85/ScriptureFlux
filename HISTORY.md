@@ -1,5 +1,22 @@
 # HISTORY.md
 
+## 2026-05-22 (v0.8.0 성능 실험 - OffscreenCanvas 백버퍼 렌더링)
+
+- 작업: `NetworkCanvas`의 정적 배경 네트워크를 `OffscreenCanvas` 우선 백버퍼에 캐싱하고, foreground 캔버스에서는 캐시된 배경 복사 후 active/pinned 링크만 덧그리도록 렌더링 경로를 분리. 잘못된 교차 참조 튜플이 포함되어도 전체 React 렌더가 중단되지 않도록 유효성 방어 필터를 추가.
+- 변경 파일:
+  - `src/components/NetworkCanvas.tsx`: `OffscreenCanvas`/HTMLCanvas fallback 백버퍼 생성, 정적 배경 레이어와 foreground active/pinned 레이어 분리, 책 hover lazy loading 유지, invalid tuple 방어 필터 추가
+  - `TASKS.md`, `CHANGELOG.md`, `DECISIONS.md`, `HISTORY.md`: 성능 실험 작업 이력과 검증 결과 기록
+- 검증:
+  - 로컬 `npm run lint`: 경고/오류 없이 통과
+  - 로컬 `npm run typecheck`: 무오류 통과
+  - 로컬 `npm run test`: 1개 테스트 파일, 4개 테스트 통과
+  - 로컬 `npm run build`: dist 정적 SPA 빌드 성공
+  - Playwright CLI + Edge headless: `http://127.0.0.1:5180/ScriptureFlux/`에서 페이지 오류 없이 본문과 캔버스 크기 확인, 스크린샷으로 네트워크 렌더링 확인
+- 결과: 성공 (Canvas 2D 아키텍처를 유지하면서 배경 전체 재렌더 비용을 줄이는 OffscreenCanvas 실험 적용)
+- 후속 작업:
+  - 모바일 UI 터치 슬라이딩 및 스와이프 제스처 최적화
+  - 데이터 파이프라인에서 invalid tuple을 생성 단계에서 제거하고 report에 집계
+
 ## 2026-05-22 (v0.8.0 유지보수 - Canvas Hooks 의존성 경고 정리)
 
 - 작업: `NetworkCanvas`의 책별 세부 교차 참조 lazy loading 함수를 안정적인 `useCallback` 구조로 정리하고, 로드 완료/진행 중 책 목록을 `ref`로 관리하여 React Hooks 의존성 경고를 제거.

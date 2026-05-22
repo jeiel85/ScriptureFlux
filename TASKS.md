@@ -112,9 +112,16 @@
 - [x] `useEffect`/`useMemo` 의존성 배열을 실제 데이터 흐름과 일치하도록 보정
 - [x] `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` 통과 확인
 
+## v0.8.0 성능 실험 - OffscreenCanvas 백버퍼 렌더링 (완료)
+
+- [x] `OffscreenCanvas` 지원 브라우저에서는 정적 배경 네트워크를 백버퍼에 사전 렌더링
+- [x] `OffscreenCanvas` 미지원 환경에서는 HTMLCanvas fallback으로 동일 렌더링 경로 유지
+- [x] active/pinned 링크 변경 시 배경 전체를 다시 그리지 않고 캐시 복사 후 강조 링크만 덧그리도록 foreground 렌더링 분리
+- [x] invalid cross-reference tuple이 렌더링 전체를 중단하지 않도록 방어 필터 추가
+- [x] `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`, 로컬 브라우저 대체 검증 통과 확인
+
 ## 후속 아이디어
 
 - [ ] 성경 본문 번역 선택 구조 확장 (예: 쉬운성경, NIV 등)
-- [ ] WebGL 또는 OffscreenCanvas 기반 수만 개 선 렌더링 실험
 - [ ] 모바일 UI 터치 슬라이딩 및 스와이프 제스처 최적화
-
+- [ ] 데이터 파이프라인에서 invalid tuple 생성 원인 추적 및 report 집계
