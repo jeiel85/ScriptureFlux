@@ -62,8 +62,8 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
   const [isFocused, setIsFocused] = useState(false);
 
   // LOD(Level of Detail) 2단계 레이지 로딩 상태
-  const [initialLinks, setInitialLinks] = useState<any[]>([]);
-  const [detailedLinks, setDetailedLinks] = useState<any[]>([]);
+  const [initialLinks, setInitialLinks] = useState<number[][]>([]);
+  const [detailedLinks, setDetailedLinks] = useState<number[][]>([]);
   const [loadedBooks, setLoadedBooks] = useState<Set<number>>(new Set());
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
@@ -95,7 +95,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
         const merged = [...prev];
         const existingKeys = new Set(merged.map(item => `${item[0]}-${item[1]}-${item[2]}-${item[3]}-${item[4]}-${item[5]}`));
         
-        data.forEach((item: any) => {
+        data.forEach((item: number[]) => {
           const key = `${item[0]}-${item[1]}-${item[2]}-${item[3]}-${item[4]}-${item[5]}`;
           if (!existingKeys.has(key)) {
             merged.push(item);
@@ -116,6 +116,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
     }
   };
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   // activeLink, pinnedLink, searchVerse 활성화 시 관련 구절의 세부 교차 참조도 백그라운드 선패치 수행
   useEffect(() => {
     if (activeLink) {
@@ -130,6 +131,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
       loadBookDetails(searchVerse.bookIndex);
     }
   }, [activeLink, pinnedLink, searchVerse]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
 
   // 1. 창 크기 변화 대응 (Responsive Layout) - clientWidth/Height 기반 정밀 보정
@@ -262,6 +264,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
     }).length;
   }, [filteredLinks, searchVerse]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   // 딥링크 복원 (initialPinnedRefs 파싱 후 매칭 링크 복원)
   useEffect(() => {
     if (!initialPinnedRefs) return;
@@ -286,6 +289,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
       setInitialPinnedRefs(null); // 복원 성공했으므로 초기화
     }
   }, [initialPinnedRefs, allLinks]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // 5. Canvas 고해상도 렌더링 & 애니메이션 루프
   useEffect(() => {
@@ -383,17 +387,13 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
         }
 
         // 구신약별 곡선 컬러 (검색 활성화 상태라면 비매칭 선들을 어둡게 Dimming)
-        let strokeColor = '';
-        if (hasSearch) {
-          strokeColor = 'rgba(255, 255, 255, 0.015)'; // 극도의 Dimming
-        } else {
-          strokeColor =
-            link.testamentClass === 'OT_TO_OT'
-              ? 'rgba(59, 130, 246, 0.08)'
-              : link.testamentClass === 'NT_TO_NT'
-              ? 'rgba(236, 72, 153, 0.08)'
-              : 'rgba(16, 185, 129, 0.12)';
-        }
+        const strokeColor = hasSearch
+          ? 'rgba(255, 255, 255, 0.015)' // 극도의 Dimming
+          : link.testamentClass === 'OT_TO_OT'
+          ? 'rgba(59, 130, 246, 0.08)'
+          : link.testamentClass === 'NT_TO_NT'
+          ? 'rgba(236, 72, 153, 0.08)'
+          : 'rgba(16, 185, 129, 0.12)';
 
         ctx.strokeStyle = strokeColor;
 

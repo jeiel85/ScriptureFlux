@@ -79,6 +79,7 @@ export const ReferenceCard: React.FC<ReferenceCardProps> = ({
     if (!displayLink) return;
 
     let isSubscribed = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
 
     const loadTexts = async () => {
@@ -110,7 +111,7 @@ export const ReferenceCard: React.FC<ReferenceCardProps> = ({
           });
           setIsLoading(false);
         }
-      } catch (err) {
+      } catch {
         if (isSubscribed) {
           setTexts({
             sourceKo: "텍스트 로드 실패",
