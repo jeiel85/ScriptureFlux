@@ -1,0 +1,177 @@
+{
+  "generated_at": "2026-05-22",
+  "project": "ScriptureFlux",
+  "description": "Integrated Markdown bundle combining existing agent rules with ScriptureFlux design specification.",
+  "files": [
+    {
+      "path": ".cursorrules",
+      "bytes": 112,
+      "sha256": "e2400f8af6cbcf1d318f52ffadca5e9603c8aa4141d2deef08ac081a4398141f"
+    },
+    {
+      "path": "AGENTS.md",
+      "bytes": 34287,
+      "sha256": "4ee37f8dc5ab5255adf0d52a3164075e77b5de0a81b0643148b274576db33eee"
+    },
+    {
+      "path": "AGENT_START_PROMPT.md",
+      "bytes": 1208,
+      "sha256": "9b1d0d348517ddcc550b80ae6ae0b412b8de38040a9702d0dbf11de71fb48435"
+    },
+    {
+      "path": "ATTRIBUTION.md",
+      "bytes": 749,
+      "sha256": "3c7fc5f96636c4e5a8f3b3175d9156b99340f6d99835bf84852bf5438f64f7c6"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 2014,
+      "sha256": "6b915b751cdb6285227991abf860b31981b3707196df37219e87e7d0243f4450"
+    },
+    {
+      "path": "CLAUDE.md",
+      "bytes": 112,
+      "sha256": "e2400f8af6cbcf1d318f52ffadca5e9603c8aa4141d2deef08ac081a4398141f"
+    },
+    {
+      "path": "CURSOR.md",
+      "bytes": 170,
+      "sha256": "dbcd8c1d58a56fcd40c6d830a3ef960e08d7021928205f37a038819b6cf21f95"
+    },
+    {
+      "path": "DECISIONS.md",
+      "bytes": 1969,
+      "sha256": "48dfb90eb3f7ae9a14ca235a8db4b9e641318fc709ba0c761f91f6ea8d904e59"
+    },
+    {
+      "path": "GEMINI.md",
+      "bytes": 112,
+      "sha256": "e2400f8af6cbcf1d318f52ffadca5e9603c8aa4141d2deef08ac081a4398141f"
+    },
+    {
+      "path": "HISTORY.md",
+      "bytes": 2646,
+      "sha256": "d0a381d5e91251284c73d206feaa9692292c9dda928f7e4e9e08ee43d8341cc0"
+    },
+    {
+      "path": "README.md",
+      "bytes": 4414,
+      "sha256": "f201648ae8454dc2e3da88e0d447e159b297f06ea9714eff2bd1c0fe5cc7d750"
+    },
+    {
+      "path": "ScriptureFlux_Integrated_Master_Spec.md",
+      "bytes": 86300,
+      "sha256": "e8db8280e4e2613fe2228fd555bfb930ef9e49c6dcea8facdc64b56b297eabbf"
+    },
+    {
+      "path": "TASKS.md",
+      "bytes": 2550,
+      "sha256": "84b9e96fdfc57c35c0ab435913ac82b9c84c41b41a2babfb682105709b88451f"
+    },
+    {
+      "path": "docs/00_DESIGN_INDEX.md",
+      "bytes": 2609,
+      "sha256": "94cad8f43a98b7b87b32f911a2731bb6ffd6bd811ac5f7e800f5e6ca37d6f9ca"
+    },
+    {
+      "path": "docs/01_PROJECT_BRIEF.md",
+      "bytes": 2130,
+      "sha256": "8cf628663694dbc6e00c547939aff40859632a98d2c39928396568acf891b2ad"
+    },
+    {
+      "path": "docs/02_PRODUCT_REQUIREMENTS.md",
+      "bytes": 3090,
+      "sha256": "661cb1ba1d8781089b75fe36d7711874690718c46a2b30a6dc03633eac14b426"
+    },
+    {
+      "path": "docs/03_TECHNICAL_ARCHITECTURE.md",
+      "bytes": 2639,
+      "sha256": "b65f9c62b782340e81645b4528f293ccf7657ef37998dd66c8c551489e9961c7"
+    },
+    {
+      "path": "docs/04_DATASET_AND_LICENSE_STRATEGY.md",
+      "bytes": 3169,
+      "sha256": "810b4163d1d6b68696c313ae4ab62b5f90604f797dbb11d6e73df70ff05c5c6b"
+    },
+    {
+      "path": "docs/05_DATA_SCHEMA_AND_PIPELINE.md",
+      "bytes": 3046,
+      "sha256": "86be7733709130cf4089eaf73f35131354183918ac4bdee7fe1b690efe17fb2b"
+    },
+    {
+      "path": "docs/06_VISUALIZATION_RENDERING_SPEC.md",
+      "bytes": 3127,
+      "sha256": "02717ce8938337e6208ece92466be189840d943575c53b121dbc2d621b6e065b"
+    },
+    {
+      "path": "docs/07_UI_UX_DESIGN_GUIDE.md",
+      "bytes": 3287,
+      "sha256": "0d4a783faf448c897391d24f5290a56b4132ee15182bdc7475c2dda09670d2c5"
+    },
+    {
+      "path": "docs/08_COMPONENT_STRUCTURE.md",
+      "bytes": 3366,
+      "sha256": "440838a11a758e5b449843a36c99effd57316d34dac52a3011086e1950d1596f"
+    },
+    {
+      "path": "docs/09_IMPLEMENTATION_ROADMAP.md",
+      "bytes": 2412,
+      "sha256": "1d2d9b62f8c261ec479c3844f415fa7bea5bbc7ab9ab729f9f4f1077bee96a01"
+    },
+    {
+      "path": "docs/10_QA_AND_PERFORMANCE_CHECKLIST.md",
+      "bytes": 2426,
+      "sha256": "4407a2f6e272ae50b2ce2bcc3e4aca39741f83c2b86365c1e61f73fc9cd71144"
+    },
+    {
+      "path": "docs/11_GITHUB_DEPLOYMENT.md",
+      "bytes": 2478,
+      "sha256": "e8ab8fc999b58c6f26044a94307c92a92476236709d0e2a6ebeac8941a80fb0a"
+    },
+    {
+      "path": "docs/12_AGENT_PROMPTS.md",
+      "bytes": 2313,
+      "sha256": "ba6c719f6b6bb900b3b57a91328147be1324b95bec18556e16e0fe5b154dcff0"
+    },
+    {
+      "path": "docs/ATTRIBUTION_TEMPLATE.md",
+      "bytes": 815,
+      "sha256": "0015ea6ec4b62f7f402c9f9d247dd45da106fbbb2fff84ad22cbd2881fa8f04a"
+    },
+    {
+      "path": "docs/DATA_SOURCES.md",
+      "bytes": 888,
+      "sha256": "548557c39d9a86617177333fa387729e48219ed0c9d8ee4829514d2609fc7aeb"
+    },
+    {
+      "path": "docs/SCRIPTUREFLUX_AGENT_IMPLEMENTATION_RULES.md",
+      "bytes": 2527,
+      "sha256": "525cd7191836d88d6f683e30dbb6b00a1732f9ca1cea0958b6199cef801d631f"
+    },
+    {
+      "path": "docs/ScriptureFlux_Agent_Master_Spec.md",
+      "bytes": 38244,
+      "sha256": "da156af95a48ad9e4db0449783177e79acc5b503760f6afed8bc9d8be4223b4c"
+    },
+    {
+      "path": "docs/source_snapshots/uploaded_AGENTS.md",
+      "bytes": 29540,
+      "sha256": "6782dfe3a1a00cd3a38040a4ef9f127f1161ab3e3a0cf5fd884c2d80d41499bd"
+    },
+    {
+      "path": "docs/source_snapshots/uploaded_CHANGELOG.md",
+      "bytes": 1037,
+      "sha256": "dc49270d33124ac3e557972df7ce76e303aedec1819edb9f4b911cd25076a012"
+    },
+    {
+      "path": "docs/source_snapshots/uploaded_HISTORY.md",
+      "bytes": 1364,
+      "sha256": "cb67ceb793f303cb0e81f2e0767cb3b08edb1ddeb6af07cc5194ed48878cc30e"
+    },
+    {
+      "path": "docs/source_snapshots/uploaded_README.md",
+      "bytes": 1951,
+      "sha256": "2736a5ce22445de0a85c35305a2cccf8da1cb154e5226cc538d4511b1dd1eb7d"
+    }
+  ]
+}
