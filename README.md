@@ -4,6 +4,14 @@
 
 ScriptureFlux는 성경 전체를 하나의 연속된 축으로 표현하고, 서로 연관된 구절들을 곡선으로 연결하는 Bible Cross-Reference Visualization 프로젝트입니다. 기본 화면에서는 실제 구절 본문을 노출하지 않고, 사용자가 연결선에 hover 또는 focus했을 때만 source/target 구절과 참조 정보를 오버레이 카드로 보여줍니다.
 
+## 🎨 Original Inspiration (영감을 준 프로젝트)
+
+ScriptureFlux는 **크리스 해리슨(Chris Harrison)** 교수의 2008년 시각화 예술 작품인 **"Bible Cross-References"**와 **OpenBible.info** 프로젝트의 오픈 데이터에서 직접적인 영감을 받아 탄생하였습니다. 
+- **시각화 아이디어**: [Chris Harrison's Bible Visualization](https://www.chrisharrison.net/index.php/Visualizations/BibleVis)
+- **교차 참조 데이터**: [OpenBible.info (Christoph Römhild & Sean Harrison)](https://www.openbible.info)
+
+원작자들의 뛰어난 창의성과 데이터를 아낌없이 개방해 주신 헌신에 마음 깊이 존경과 감사를 표합니다. 자세한 출처와 라이선스에 관한 정보는 [ATTRIBUTION.md](file:///D:/Project/ScriptureFlux/ATTRIBUTION.md) 문서에서 확인할 수 있습니다.
+
 ## 핵심 목표
 
 - 성경 66권의 유기적 연결성을 한눈에 보여주기

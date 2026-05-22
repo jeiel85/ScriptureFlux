@@ -1,5 +1,25 @@
 # HISTORY.md
 
+## 2026-05-22 (P1 & P2 고도화 개발 및 감사 헌사 UI/문서 최종 탑재)
+
+- 작업: 교차 참조 인터랙션 안정성 확보(120ms 호버 디바운스, 클릭 핀 고정), 국문 개역한글(1961) 성경 로컬 DB 생성 및 한/영 다국어 듀얼 레이아웃 탑재, 모바일 60FPS 최적화(DPR 1.5 제한 및 터치 히트 반경 18px), 오리지널 시각 예술 영감(Chris Harrison & OpenBible.info) 감사 헌사 UI/문서 보강
+- 변경 파일:
+  - `src/data/verse-text.ko.json` [NEW]: 퍼블릭 도메인 개역한글 30개 고유 구절 DB 수록
+  - `src/components/NetworkCanvas.tsx`: 120ms 호버 디바운스 Dwell 로직 추가, 클릭을 통한 activeLink 고정(`pinnedLink`), 모바일 dpr 1.5 Clamping 제한, 터치 히트 반경 18px 확장, 골드 네온 라인 및 지속 앵커 드로잉 탑재
+  - `src/components/ReferenceCard.tsx`: 한/영 듀얼 렌더링 카드 구조 설계, 핀 배지 및 핀 해제 닫기 버튼 추가
+  - `src/App.tsx`: 헌사 설명 패널 및 푸터 감사 헌사 2단 기둥 반영, `pinnedLink` 상태 및 해제 이벤트 바인딩
+  - `ATTRIBUTION.md`: Chris Harrison 및 OpenBible.info에 대한 경의 깊은 헌사 마크다운 수록
+  - `README.md`: 영감을 준 프로젝트 섹션 보강
+  - `DECISIONS.md`, `TASKS.md`, `HISTORY.md`, `CHANGELOG.md`: 이력/의사결정 문서 일제 갱신
+- 검증:
+  - 로컬 `npm.cmd run lint` (ESLint): 무경고 패스
+  - 로컬 `npm.cmd run typecheck` (tsc): 무오류 통과
+  - 로컬 `npm.cmd run test` (Vitest): 유닛 테스트 100% 통과
+  - 로컬 `npm.cmd run build` (Vite Build): 1.10s 만에 에러 없이 정적 SPA 빌드 성공
+- 결과: 성공 (모든 고도화 및 감사 헌사 완수)
+- 후속 작업:
+  - 교차 참조 전체 데이터셋 34만개 파이프라인 생성 및 점진적 lazy-loading 구조 도입
+
 ## 2026-05-22 (P1 & P2 고도화 개발 완료 및 CI/CD 워크플로우 탑재)
 
 - 작업: 키보드 접근성 탐색, 모바일 및 터치 기기 조작 보완, Reduced Motion OS 애니메이션 축소 대응, GitHub Actions CI/CD 파이프라인 탑재 완료

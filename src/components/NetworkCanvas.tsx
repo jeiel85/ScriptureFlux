@@ -29,6 +29,8 @@ export interface RenderLink {
 interface NetworkCanvasProps {
   activeLink: RenderLink | null;
   setActiveLink: (link: RenderLink | null) => void;
+  pinnedLink: RenderLink | null;
+  setPinnedLink: (link: RenderLink | null) => void;
   filterType: 'ALL' | 'OT_ONLY' | 'NT_ONLY' | 'OT_NT';
 }
 
@@ -38,6 +40,8 @@ const AXIS_Y_OFFSET = 80; // 하단 여백 (축 렌더링 공간)
 export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
   activeLink,
   setActiveLink,
+  pinnedLink,
+  setPinnedLink,
   filterType,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,6 +49,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
   const [dimensions, setDimensions] = useState({ width: 1000, height: 600 });
   const mouseRef = useRef<{ x: number; y: number } | null>(null);
   const rAFRef = useRef<number | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 0. 접근성 및 키보드 상태 선언
   const [isFocused, setIsFocused] = useState(false);
@@ -152,9 +157,12 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = dimensions.width * dpr;
-    canvas.height = dimensions.height * dpr;
-    ctx.scale(dpr, dpr);
+    const isMobile = dimensions.width < 768;
+    const targetDpr = isMobile ? Math.min(1.5, dpr) : dpr;
+
+    canvas.width = dimensions.width * targetDpr;
+    canvas.height = dimensions.height * targetDpr;
+    ctx.scale(targetDpr, targetDpr);
 
     const draw = () => {
       // 캔버스 초기화
@@ -197,7 +205,6 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
 
         // 텍스트 라벨 (간격을 두고 겹치지 않게 표시하거나 크기에 맞춰 렌더링)
         const textWidth = ctx.measureText(book.ko).width;
-        const isMobile = dimensions.width < 768;
         const skipLabel = isMobile ? (i % 6 === 0) : (i % 3 === 0);
 
         if (width > textWidth + 4 || (skipLabel && width > 10)) {
@@ -210,11 +217,12 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
 
       // 5-2. 기본 백그라운드 네트워크 곡선 그리기 (faint alpha, no glow)
       ctx.shadowBlur = 0; // 최적화: glow 제거
-      ctx.lineWidth = 0.75;
+      ctx.lineWidth = isMobile ? 0.5 : 0.75;
       
       filteredLinks.forEach((link) => {
-        // Active Link는 나중에 위에 덧그릴 것이므로 스킵
+        // Active Link 및 Pinned Link는 나중에 위에 덧그릴 것이므로 스킵
         if (activeLink && activeLink.id === link.id) return;
+        if (pinnedLink && pinnedLink.id === link.id) return;
 
         // 구신약별 곡선 컬러
         const strokeColor =
@@ -239,7 +247,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
       });
 
       // 5-3. 활성화된 단 하나의 링크(Active Link)만 강력하게 강조하여 덧그리기 (Glow 적용)
-      if (activeLink) {
+      if (activeLink && (!pinnedLink || pinnedLink.id !== activeLink.id)) {
         const h = getBezierHeight(activeLink.x0, activeLink.x1);
         const cp1x = activeLink.x0;
         const cp1y = activeLink.y0 - h;
@@ -285,26 +293,76 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
           activeLink.y1 - 12
         );
       }
+
+      // 5-4. 고정된 링크(Pinned Link) 렌더링 (골드/오렌지 네온 하이라이트)
+      if (pinnedLink) {
+        const h = getBezierHeight(pinnedLink.x0, pinnedLink.x1);
+        const cp1x = pinnedLink.x0;
+        const cp1y = pinnedLink.y0 - h;
+        const cp2x = pinnedLink.x1;
+        const cp2y = pinnedLink.y1 - h;
+
+        // 1) 골드 Glow 효과를 위한 굵은 섀도우선
+        ctx.save();
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = '#f59e0b';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(pinnedLink.x0, pinnedLink.y0);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, pinnedLink.x1, pinnedLink.y1);
+        ctx.stroke();
+
+        // 2) 소스 및 타겟 앵커 서클 렌더링
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(pinnedLink.x0, pinnedLink.y0, 7, 0, Math.PI * 2);
+        ctx.arc(pinnedLink.x1, pinnedLink.y1, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 3) 앵커 텍스트 표시
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        
+        const srcBookName = books[pinnedLink.source.bookIndex].ko;
+        const tgtBookName = books[pinnedLink.target.bookIndex].ko;
+        
+        ctx.fillText(
+          `📌 ${srcBookName} ${pinnedLink.source.chapter}:${pinnedLink.source.verse}`,
+          pinnedLink.x0,
+          pinnedLink.y0 - 15
+        );
+        ctx.fillText(
+          `📌 ${tgtBookName} ${pinnedLink.target.chapter}:${pinnedLink.target.verse}`,
+          pinnedLink.x1,
+          pinnedLink.y1 - 15
+        );
+      }
     };
 
     draw();
-  }, [dimensions, filteredLinks, activeLink, xScale]);
+  }, [dimensions, filteredLinks, activeLink, pinnedLink, xScale]);
 
-  // 6. rAF 기반 pointermove 쓰로틀 좌표 감지 연산 (60FPS 인터랙션 최적화)
+  // 6. 120ms 호버 디바운스 기반 pointermove 좌표 감지 연산 (인터랙션 요동 떨림 방지)
   const updateActiveLinkAtCoordinates = (x: number, y: number) => {
     mouseRef.current = { x, y };
 
-    if (rAFRef.current) return;
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
 
-    rAFRef.current = requestAnimationFrame(() => {
-      rAFRef.current = null;
+    debounceTimerRef.current = setTimeout(() => {
       if (!mouseRef.current) return;
 
       const mx = mouseRef.current.x;
       const my = mouseRef.current.y;
 
       let foundActiveLink: RenderLink | null = null;
-      let minDistance = 10; // 10픽셀 이내만 호버로 판정
+      const isMobile = dimensions.width < 768;
+      let minDistance = isMobile ? 18 : 10; // 모바일 터치 히트 반경 18px 확장
 
       filteredLinks.forEach((link) => {
         const h = getBezierHeight(link.x0, link.x1);
@@ -336,7 +394,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
       if (foundActiveLink !== activeLink) {
         setActiveLink(foundActiveLink);
       }
-    });
+    }, 120); // 120ms 디바운스 타임
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -372,11 +430,62 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
 
   const handleMouseLeave = () => {
     mouseRef.current = null;
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
     if (rAFRef.current) {
       cancelAnimationFrame(rAFRef.current);
       rAFRef.current = null;
     }
     setActiveLink(null);
+  };
+
+  // 7-1. 클릭(Click/Tap) 기반 고정(Pin) 상태 바인딩
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    let foundLink: RenderLink | null = null;
+    const isMobile = dimensions.width < 768;
+    let minDistance = isMobile ? 18 : 10;
+
+    filteredLinks.forEach((link) => {
+      const h = getBezierHeight(link.x0, link.x1);
+      const cp1x = link.x0;
+      const cp1y = link.y0 - h;
+      const cp2x = link.x1;
+      const cp2y = link.y1 - h;
+
+      const dist = distanceToBezier(
+        x,
+        y,
+        link.x0,
+        link.y0,
+        cp1x,
+        cp1y,
+        cp2x,
+        cp2y,
+        link.x1,
+        link.y1
+      );
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        foundLink = link;
+      }
+    });
+
+    if (foundLink) {
+      setPinnedLink(foundLink);
+      setActiveLink(foundLink);
+    } else {
+      setPinnedLink(null);
+    }
   };
 
   // 8. 키보드 탐색(Accessibility)을 위한 KeyDown 핸들러
@@ -417,6 +526,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleMouseLeave}
+        onClick={handleCanvasClick}
         className="block cursor-pointer"
       />
 
