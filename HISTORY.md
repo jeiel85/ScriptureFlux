@@ -2,24 +2,29 @@
 
 ## 2026-05-22
 
-- 작업: 기존 범용 에이전트 MD 파일과 ScriptureFlux 성경 교차 참조 시각화 설계 묶음 통합
+- 작업: ScriptureFlux 성경 교차 참조 시각화 SPA MVP 구현 완료, 빌드 에러/린트 오류 해결 및 원격 GitHub 저장소 푸시 완료
 - 변경 파일:
-  - AGENTS.md: 기존 Automation First, Scope Control, 검증/릴리즈 규칙을 유지하면서 ScriptureFlux 프로젝트 설정값과 구현 세부 규칙 추가
-  - README.md: 범용 AGENTS 템플릿 소개에서 ScriptureFlux 프로젝트 README로 전환
-  - TASKS.md: 구현 단계별 작업 목록 추가
-  - DECISIONS.md: Canvas 2D, D3 보조 사용, 데이터/본문 분리, 정적 SPA 제한 결정 기록
-  - ATTRIBUTION.md: 데이터 출처와 성경 본문 라이선스 기록 템플릿 추가
-  - docs/: 기존 ScriptureFlux 설계 문서와 원본 업로드 스냅샷 보존
-  - CHANGELOG.md: v0.2.0 문서 통합 기록 추가
+  - `src/components/NetworkCanvas.tsx`: ESLint 미사용 변수(offsetToX, dx) 제거, strokeColor 대입 최적화(const ternary), type import 대응
+  - `src/App.tsx`: type-only import(`type RenderLink`)로 수정하여 TS1484 에러(verbatimModuleSyntax 규칙) 해결
+  - `src/components/ReferenceCard.tsx`: type-only import(`import type { RenderLink }`)로 수정하여 TS1484 에러 해결
+  - `src/utils/projection.ts`: `let localOffset`을 `const`로 변경하여 ESLint(prefer-const) 에러 해결
+  - `TASKS.md`: 완료된 태스크 반영 갱신
+  - `HISTORY.md`, `CHANGELOG.md`: 최종 구현 완료 요약 기록
 - 검증:
-  - 업로드된 AGENTS/README/HISTORY/CHANGELOG 파일 내용 확인
-  - 기존 ScriptureFlux 설계 묶음 파일 확인
-  - 통합 MD 파일 생성 및 ZIP 패키징 확인
-- 결과: 성공
+  - 로컬 `npm run lint` 실행: 무오류 성공 통과
+  - 로컬 `npm run test` 실행: `projection.test.ts` 4개 유닛 테스트 100% 성공 통과
+  - 로컬 `npm run typecheck` 및 `npm run build` 실행: `dist/` 정적 asset(index.html, JS, CSS) 빌드 성공
+  - `git push -u origin main` 실행: 원격 origin(https://github.com/jeiel85/ScriptureFlux.git) main 브랜치로 커밋 푸시 성공
+- 결과: 성공 (MVP 빌드본 원격 도달)
 - 후속 작업:
-  - 실제 GitHub 저장소 생성 후 Repository URL 확정
-  - 앱 구현 시작 후 `npm run lint`, `npm run typecheck`, `npm run build` 검증
-  - 데이터셋 출처와 성경 본문 라이선스 최종 확인
+  - GitHub Actions 기반 자동화 빌드/배포(GitHub Pages) 추가
+  - keyboard focus 대체 인터랙션 설계 및 reduced motion/모바일 반응형 보완
+
+---
+
+## 2026-05-22 (이전 통합 작업)
+
+- 작업: 기존 범용 에이전트 MD 파일과 ScriptureFlux 성경 교차 참조 시각화 설계 묶음 통합
 
 ---
 
