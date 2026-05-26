@@ -118,7 +118,7 @@ function App() {
               <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-1.5 m-0">
                 ScriptureFlux
                 <span className="text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-md">
-                  v0.10.0 Premium
+                  v0.10.1 Premium
                 </span>
               </h1>
             </div>
@@ -231,14 +231,19 @@ function App() {
           </div>
 
           {/* B. Weight 가중치 슬라이더 */}
-          <div className="lg:col-span-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-emerald-400 ml-1" />
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">연관 강도(Weight) 필터</span>
+          <div className="lg:col-span-3 flex flex-col gap-2 justify-between">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-emerald-400 ml-1" />
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">참조 연관 강도 필터</span>
+                </div>
+                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded">
+                  최소 {minWeight.toFixed(2)}
+                </span>
               </div>
-              <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded">
-                min. {minWeight.toFixed(2)}
+              <span className="text-[10px] text-slate-500 leading-normal">
+                값이 높을수록 연관성이 깊은 핵심 연결선만 필터링하여 보여줍니다.
               </span>
             </div>
             <div className="flex items-center h-full px-1">
