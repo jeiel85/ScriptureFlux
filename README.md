@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://jeiel85.github.io/scripture-flux-web/"><img src="https://img.shields.io/badge/GitHub%20Pages-Live%20Demo-2ea44f?style=for-the-badge&logo=github" alt="GitHub Pages Live Demo" /></a>
-  <a href="https://github.com/jeiel85/scripture-flux-web"><img src="https://img.shields.io/badge/Version-v0.9.0-0f766e?style=for-the-badge" alt="Version v0.9.0" /></a>
+  <a href="https://github.com/jeiel85/scripture-flux-web"><img src="https://img.shields.io/badge/Version-v0.10.0-0f766e?style=for-the-badge" alt="Version v0.10.0" /></a>
   <img src="https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62B" alt="Vite" />
   <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
   <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
@@ -34,6 +34,8 @@
 *   📌 **클릭 고정 메커니즘 (Pinning)**: 교차 참조 곡선을 클릭하면 **골드 네온 라인(#f59e0b)**과 텍스트 라벨이 영구 고정되어 마우스 포인터가 벗어나도 카드 정보를 안정적으로 읽을 수 있습니다.
 *   ⏱️ **120ms 호버 디바운스 (Stabilization)**: 마우스가 캔버스 위를 빠르게 움직일 때 하단 정보 카드가 파르르 떨리거나 수시로 교체되어 깜빡이는 시각적 피로를 완벽히 종식시켰습니다.
 *   📖 **개역한글 & KJV 한/영 다국어 듀얼 레이아웃**: 완전한 퍼블릭 도메인 판본인 국문 **개역한글(1961년판)**과 영문 **KJV**를 로컬 탑재하여, 큰 한국어 구절 아래 보조 영어 구절이 점선 분리되어 수려하게 표시됩니다.
+*   🔍 **성경 네트워크 줌(Zoom) & 드래그 팬(Pan) 시스템**: 마우스 휠 스크롤 및 모바일 2손가락 핀치 줌을 통해 가로 성경 축을 최대 10배까지 세밀하게 확대/축소할 수 있으며, 확대된 상태에서 캔버스 빈 영역을 드래그해 부드럽게 좌우 탐색(Clamping 가로축 가둠 포함)할 수 있습니다.
+*   🎛️ **글래스모프 플로팅 줌 컨트롤러**: 캔버스 우측 하단에 단계적 줌인(`＋`), 줌아웃(`－`), 1:1 초기화(`RESET`) 및 줌 배율 실시간 모니터링 배지를 지원하는 현대적 플로팅 조작계를 제공합니다.
 *   ♿ **강력한 웹 접근성(a11y) 지원**: Tab 키 및 키보드 방향키(`ArrowLeft/Right/Up/Down/Escape`)를 통한 네트워크 전체 탐색 조작 및 포커스 링을 제공합니다.
 *   📱 **모바일 60FPS 최적화 & Reduced Motion**: 
     *   초고해상도 Retina/OLED 화면에서의 과부하를 막기 위해 **DPR 최대 1.5로 Clamping 제한**

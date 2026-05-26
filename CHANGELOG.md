@@ -1,14 +1,34 @@
 # CHANGELOG.md
 
-## Unreleased - 2026-05-26
+## v0.10.0 - 2026-05-26
+
+### Added
+- **성경 네트워크 줌(Zoom) & 드래그 팬(Pan) 시스템 대통합**:
+  - 가로 성경 축 전체를 마우스 휠 및 모바일 2손가락 핀치 제스처를 통해 최대 10배까지 세밀하고 부드럽게 확대/축소할 수 있는 줌 시스템 구현.
+  - 줌이 확대된 상태에서 캔버스 빈 영역을 마우스 클릭 드래그 또는 1손가락 스와이프를 통해 좌우로 부드럽게 넘겨볼 수 있는 드래그 팬(Pan) 탑재.
+  - 드래그 동작 중 캔버스가 화면 경계를 너무 많이 이탈해 탈출하지 못하도록 한계를 차단하는 경계 클램핑(Clamping) 제한식 추가.
+- **줌/팬 좌표 역투영(Unprojection) 수학 필터 연동 (정합성)**:
+  - 축이 확대되거나 이동하더라도 마우스 커서 호버링과 클릭을 통한 📌 정보 고정(Pin) 기능에 오차가 없도록 입력 좌표를 D3 Scale 상의 원래 좌표계로 투역 변환하는 `applyZoom` 및 `invertZoom` 수학식 결합.
+- **프리미엄 글래스모프 플로팅 줌 컨트롤러 UI 탑재 (Aesthetics & Accessibility)**:
+  - 캔버스 내부 우측 하단 영역에 은은한 Backdrop Blur 효과와 Emerald 포인트 컬러가 적용된 고급 플로팅 줌 패널 추가.
+  - 마우스 휠이 없는 노트북 트랙패드 및 일반 환경에서도 간편하게 누를 수 있는 단계적 줌인(`＋`), 줌아웃(`－`), 1:1 초기화(`RESET`) 단추 및 실시간 배율 상태 배지 연동.
+
+### Changed
+- 줌 상태에 따라 모바일 및 소형 모니터 환경에서 성경 66권 책 라벨 글자가 서로 겹치던 가독성 한계를 Clamping 필터 적용을 통해 미려하게 보완.
 
 ### Documentation
-- README의 GitHub Pages URL, 저장소 링크, 공개 메타데이터, 최신 v0.9.0 기능 요약을 현재 저장소 기준으로 정리했습니다.
+- README의 GitHub Pages URL, 저장소 링크, 공개 메타데이터, 최신 v0.10.0 기능 요약을 현재 저장소 기준으로 정리했습니다.
 - GitHub 배포 가이드와 AGENTS 프로젝트 설정의 저장소명 및 Pages base 경로 예시를 `scripture-flux-web` 기준으로 동기화했습니다.
 - README에서 참조하던 로컬 `file:///` 링크를 저장소 상대 링크로 교체하고, 누락되어 있던 MIT `LICENSE` 파일을 추가했습니다.
 
 ### Build / CI
-- `package.json`, `package-lock.json`, 앱 헤더 버전 배지를 `v0.9.0`으로 맞춰 공개 이력과 실제 표기가 어긋나지 않도록 정리했습니다.
+- `package.json`, `package-lock.json`, 앱 헤더 버전 배지를 `v0.10.0`으로 맞춰 공개 이력과 실제 표기가 어긋나지 않도록 정리했습니다.
+- `npm run lint` 및 `npm run typecheck`, Vite 프로덕션 dist/ 정적 빌드를 100% 성공 통과시켰습니다.
+
+### Verification
+- `npm run lint`: 100% 통과
+- `npm run typecheck`: TypeScript 형식 검사 통과
+- `npm run build`: Vite 정적 릴리즈 번들 컴파일 성공
 
 ---
 

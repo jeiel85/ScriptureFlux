@@ -55,11 +55,13 @@ function createCanvasBuffer(width: number, height: number): CanvasBuffer {
   return canvas;
 }
 
-function drawBezierPath(ctx: CanvasContext2D, link: RenderLink) {
-  const h = getBezierHeight(link.x0, link.x1);
+function drawBezierPath(ctx: CanvasContext2D, link: RenderLink, applyZoom: (x: number) => number) {
+  const zx0 = applyZoom(link.x0);
+  const zx1 = applyZoom(link.x1);
+  const h = getBezierHeight(zx0, zx1);
   ctx.beginPath();
-  ctx.moveTo(link.x0, link.y0);
-  ctx.bezierCurveTo(link.x0, link.y0 - h, link.x1, link.y1 - h, link.x1, link.y1);
+  ctx.moveTo(zx0, link.y0);
+  ctx.bezierCurveTo(zx0, link.y0 - h, zx1, link.y1 - h, zx1, link.y1);
   ctx.stroke();
 }
 
@@ -94,6 +96,16 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const loadedBooksRef = useRef<Set<number>>(new Set());
   const loadingBooksRef = useRef<Set<number>>(new Set());
+
+  // 줌 및 팬 제어 상태 추가
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const [offsetX, setOffsetX] = useState<number>(0);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  // 드래그 및 터치/핀치 줌 추적용 refs
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const lastOffsetXRef = useRef<number>(0);
+  const lastTouchDistanceRef = useRef<number | null>(null);
 
   // 최초 1회: 글로벌 대표 교차 참조 데이터 페치 (LOD Level 1)
   useEffect(() => {
@@ -161,7 +173,6 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
   }, [activeLink, loadBookDetails, pinnedLink, searchVerse]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-
   // 1. 창 크기 변화 대응 (Responsive Layout) - clientWidth/Height 기반 정밀 보정
   useEffect(() => {
     if (!containerRef.current) return;
@@ -187,6 +198,51 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
       .domain([0, verseIndex.totalVerses - 1])
       .range([PADDING_X, dimensions.width - PADDING_X]);
   }, [dimensions.width]);
+
+  // 드래그 한계(Clamping) 제한
+  const clampOffsetX = useCallback((offset: number, currentZoom: number) => {
+    const maxOffset = (dimensions.width / 2 - PADDING_X) * (currentZoom - 1);
+    return Math.max(-maxOffset, Math.min(maxOffset, offset));
+  }, [dimensions.width]);
+
+  // 가로축 줌 좌표 투영 및 역투영 함수
+  const applyZoom = useCallback((x: number) => {
+    const centerX = dimensions.width / 2;
+    return (x - centerX) * zoomLevel + centerX + offsetX;
+  }, [dimensions.width, zoomLevel, offsetX]);
+
+  const invertZoom = useCallback((x: number) => {
+    const centerX = dimensions.width / 2;
+    return (x - offsetX - centerX) / zoomLevel + centerX;
+  }, [dimensions.width, zoomLevel, offsetX]);
+
+  // 마우스 휠 줌 연동 (Passive Event Listener 우회)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomFactor = 1.15;
+      let nextZoom = zoomLevel;
+
+      if (e.deltaY < 0) {
+        nextZoom = Math.min(10.0, zoomLevel * zoomFactor);
+      } else {
+        nextZoom = Math.max(1.0, zoomLevel / zoomFactor);
+      }
+
+      if (nextZoom !== zoomLevel) {
+        setZoomLevel(nextZoom);
+        setOffsetX((prev) => clampOffsetX(prev, nextZoom));
+      }
+    };
+
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', handleWheel);
+    };
+  }, [zoomLevel, clampOffsetX]);
 
   // 병합된 교차 참조 튜플 (initial + detailed)
   const combinedReferences = useMemo(() => {
@@ -360,12 +416,14 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
     const axisY = dimensions.height - AXIS_Y_OFFSET;
     if (y < axisY - 10 || y > axisY + 30) return null;
 
+    const invX = invertZoom(x);
+
     return verseIndex.books.findIndex((bookMeta) => {
       const startX = xScale(bookMeta.startVerseOffset);
       const endX = xScale(bookMeta.startVerseOffset + bookMeta.verseCount);
-      return x >= startX && x <= endX;
+      return invX >= startX && invX <= endX;
     });
-  }, [dimensions.height, xScale]);
+  }, [dimensions.height, xScale, invertZoom]);
 
   const drawStaticLayer = useCallback((ctx: CanvasContext2D, isMobile: boolean) => {
     ctx.clearRect(0, 0, dimensions.width, dimensions.height);
@@ -374,12 +432,15 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
     const currentSearchVerse = searchVerse;
     const hasSearch = currentSearchVerse !== null;
 
-    // 5-1. 성경 66권 축 및 경계 렌더링
+    // 5-1. 성경 66권 축 및 경계 렌더링 (줌 좌표계 반영)
     books.forEach((book, i) => {
       const bookMeta = verseIndex.books[i];
       const startX = xScale(bookMeta.startVerseOffset);
       const endX = xScale(bookMeta.startVerseOffset + bookMeta.verseCount);
-      const width = endX - startX;
+      
+      const zoomedStartX = applyZoom(startX);
+      const zoomedEndX = applyZoom(endX);
+      const width = zoomedEndX - zoomedStartX;
 
       // 구약과 신약의 테마 컬러 설정 (Tailwind 브랜드 색상과 매핑)
       const isOT = book.testament === 'OT';
@@ -389,25 +450,29 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
 
       // 바(Bar) 렌더링
       ctx.fillStyle = isBookHovered ? hoverColor : color;
-      ctx.fillRect(startX, axisY, width, 12);
+      ctx.fillRect(zoomedStartX, axisY, width, 12);
 
       // 경계 수직선
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(startX, axisY);
-      ctx.lineTo(startX, axisY + 25);
+      ctx.moveTo(zoomedStartX, axisY);
+      ctx.lineTo(zoomedStartX, axisY + 25);
       ctx.stroke();
 
-      // 텍스트 라벨 (간격을 두고 겹치지 않게 표시하거나 크기에 맞춰 렌더링)
+      // 텍스트 라벨 (간격을 두고 겹치지 않게 표시하되, 줌 상태에선 겹침 해제)
       const textWidth = ctx.measureText(book.ko).width;
-      const skipLabel = isMobile ? (i % 6 === 0) : (i % 3 === 0);
+      const skipLabel = zoomLevel > 1.5 
+        ? false 
+        : isMobile 
+        ? (i % 6 !== 0) 
+        : (i % 3 !== 0);
 
-      if (width > textWidth + 4 || (skipLabel && width > 10)) {
+      if (width > textWidth + 4 || (!skipLabel && width > 10)) {
         ctx.fillStyle = isBookHovered ? '#ffffff' : 'rgba(156, 163, 175, 0.7)';
         ctx.font = isMobile ? '8px sans-serif' : '10px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(book.ko, startX + width / 2, axisY + 26);
+        ctx.fillText(book.ko, zoomedStartX + width / 2, axisY + 26);
       }
     });
 
@@ -441,7 +506,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
         : 'rgba(16, 185, 129, 0.12)';
 
       ctx.strokeStyle = strokeColor;
-      drawBezierPath(ctx, link);
+      drawBezierPath(ctx, link, applyZoom);
     });
 
     // 5-2-2. 검색 매칭 링크 하이라이트 덧그리기 (Glow 적용)
@@ -464,19 +529,19 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
         ctx.shadowColor = '#10b981';
         ctx.strokeStyle = '#10b981';
         ctx.lineWidth = isMobile ? 1.2 : 1.8;
-        drawBezierPath(ctx, link);
+        drawBezierPath(ctx, link, applyZoom);
 
         // 양 앵커에 작은 점 표시
         ctx.fillStyle = '#10b981';
         ctx.shadowBlur = 5;
         ctx.beginPath();
-        ctx.arc(link.x0, link.y0, 2.5, 0, Math.PI * 2);
-        ctx.arc(link.x1, link.y1, 2.5, 0, Math.PI * 2);
+        ctx.arc(applyZoom(link.x0), link.y0, 2.5, 0, Math.PI * 2);
+        ctx.arc(applyZoom(link.x1), link.y1, 2.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       });
     }
-  }, [dimensions.height, dimensions.width, filteredLinks, hoveredBookIndex, searchVerse, xScale]);
+  }, [dimensions.height, dimensions.width, filteredLinks, hoveredBookIndex, searchVerse, xScale, applyZoom, zoomLevel]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   // 5. OffscreenCanvas 우선 백버퍼에 정적 배경 네트워크를 캐싱한다.
@@ -493,7 +558,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
     drawStaticLayer(backgroundCtx, dimensions.width < 768);
     backgroundLayerRef.current = backgroundLayer;
     setBackgroundVersion((version) => version + 1);
-  }, [dimensions, drawStaticLayer, getTargetDpr]);
+  }, [dimensions, drawStaticLayer, getTargetDpr, zoomLevel, offsetX]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // 5-1. foreground 캔버스는 캐시된 배경을 복사하고 active/pinned 링크만 덧그린다.
@@ -520,84 +585,84 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
       );
     }
 
-      // 5-3. 활성화된 단 하나의 링크(Active Link)만 강력하게 강조하여 덧그리기 (Glow 적용)
-      if (activeLink && (!pinnedLink || pinnedLink.id !== activeLink.id)) {
-        // 1) Glow 효과를 위한 굵은 섀도우선
-        ctx.save();
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#10b981';
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 2.5;
-        drawBezierPath(ctx, activeLink);
+    // 5-3. 활성화된 단 하나의 링크(Active Link)만 강력하게 강조하여 덧그리기 (Glow 적용)
+    if (activeLink && (!pinnedLink || pinnedLink.id !== activeLink.id)) {
+      // 1) Glow 효과를 위한 굵은 섀도우선
+      ctx.save();
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#10b981';
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2.5;
+      drawBezierPath(ctx, activeLink, applyZoom);
 
-        // 2) 소스 및 타겟 앵커 서클 렌더링
-        ctx.shadowBlur = 10;
-        ctx.fillStyle = '#10b981';
-        ctx.beginPath();
-        ctx.arc(activeLink.x0, activeLink.y0, 6, 0, Math.PI * 2);
-        ctx.arc(activeLink.x1, activeLink.y1, 6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+      // 2) 소스 및 타겟 앵커 서클 렌더링
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(applyZoom(activeLink.x0), activeLink.y0, 6, 0, Math.PI * 2);
+      ctx.arc(applyZoom(activeLink.x1), activeLink.y1, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
 
-        // 앵커 텍스트 표시
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 11px sans-serif';
-        ctx.textAlign = 'center';
-        
-        const srcBookName = books[activeLink.source.bookIndex].ko;
-        const tgtBookName = books[activeLink.target.bookIndex].ko;
-        
-        ctx.fillText(
-          `${srcBookName} ${activeLink.source.chapter}:${activeLink.source.verse}`,
-          activeLink.x0,
-          activeLink.y0 - 12
-        );
-        ctx.fillText(
-          `${tgtBookName} ${activeLink.target.chapter}:${activeLink.target.verse}`,
-          activeLink.x1,
-          activeLink.y1 - 12
-        );
-      }
+      // 앵커 텍스트 표시
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      
+      const srcBookName = books[activeLink.source.bookIndex].ko;
+      const tgtBookName = books[activeLink.target.bookIndex].ko;
+      
+      ctx.fillText(
+        `${srcBookName} ${activeLink.source.chapter}:${activeLink.source.verse}`,
+        applyZoom(activeLink.x0),
+        activeLink.y0 - 12
+      );
+      ctx.fillText(
+        `${tgtBookName} ${activeLink.target.chapter}:${activeLink.target.verse}`,
+        applyZoom(activeLink.x1),
+        activeLink.y1 - 12
+      );
+    }
 
-      // 5-4. 고정된 링크(Pinned Link) 렌더링 (골드/오렌지 네온 하이라이트)
-      if (pinnedLink) {
-        // 1) 골드 Glow 효과를 위한 굵은 섀도우선
-        ctx.save();
-        ctx.shadowBlur = 18;
-        ctx.shadowColor = '#f59e0b';
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 3.5;
-        drawBezierPath(ctx, pinnedLink);
+    // 5-4. 고정된 링크(Pinned Link) 렌더링 (골드/오렌지 네온 하이라이트)
+    if (pinnedLink) {
+      // 1) 골드 Glow 효과를 위한 굵은 섀도우선
+      ctx.save();
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = '#f59e0b';
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 3.5;
+      drawBezierPath(ctx, pinnedLink, applyZoom);
 
-        // 2) 소스 및 타겟 앵커 서클 렌더링
-        ctx.shadowBlur = 12;
-        ctx.fillStyle = '#f59e0b';
-        ctx.beginPath();
-        ctx.arc(pinnedLink.x0, pinnedLink.y0, 7, 0, Math.PI * 2);
-        ctx.arc(pinnedLink.x1, pinnedLink.y1, 7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+      // 2) 소스 및 타겟 앵커 서클 렌더링
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(applyZoom(pinnedLink.x0), pinnedLink.y0, 7, 0, Math.PI * 2);
+      ctx.arc(applyZoom(pinnedLink.x1), pinnedLink.y1, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
 
-        // 3) 앵커 텍스트 표시
-        ctx.fillStyle = '#f59e0b';
-        ctx.font = 'bold 11px sans-serif';
-        ctx.textAlign = 'center';
-        
-        const srcBookName = books[pinnedLink.source.bookIndex].ko;
-        const tgtBookName = books[pinnedLink.target.bookIndex].ko;
-        
-        ctx.fillText(
-          `📌 ${srcBookName} ${pinnedLink.source.chapter}:${pinnedLink.source.verse}`,
-          pinnedLink.x0,
-          pinnedLink.y0 - 15
-        );
-        ctx.fillText(
-          `📌 ${tgtBookName} ${pinnedLink.target.chapter}:${pinnedLink.target.verse}`,
-          pinnedLink.x1,
-          pinnedLink.y1 - 15
-        );
-      }
-  }, [activeLink, backgroundVersion, dimensions, getTargetDpr, pinnedLink]);
+      // 3) 앵커 텍스트 표시
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      
+      const srcBookName = books[pinnedLink.source.bookIndex].ko;
+      const tgtBookName = books[pinnedLink.target.bookIndex].ko;
+      
+      ctx.fillText(
+        `📌 ${srcBookName} ${pinnedLink.source.chapter}:${pinnedLink.source.verse}`,
+        applyZoom(pinnedLink.x0),
+        pinnedLink.y0 - 15
+      );
+      ctx.fillText(
+        `📌 ${tgtBookName} ${pinnedLink.target.chapter}:${pinnedLink.target.verse}`,
+        applyZoom(pinnedLink.x1),
+        pinnedLink.y1 - 15
+      );
+    }
+  }, [activeLink, backgroundVersion, dimensions, getTargetDpr, pinnedLink, applyZoom]);
 
   // 6. 120ms 호버 디바운스 기반 pointermove 좌표 감지 연산 (인터랙션 요동 떨림 방지)
   const updateActiveLinkAtCoordinates = (x: number, y: number) => {
@@ -625,23 +690,25 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
       let minDistance = isMobile ? 18 : 10; // 모바일 터치 히트 반경 18px 확장
 
       filteredLinks.forEach((link) => {
-        const h = getBezierHeight(link.x0, link.x1);
-        const cp1x = link.x0;
+        const zx0 = applyZoom(link.x0);
+        const zx1 = applyZoom(link.x1);
+        const h = getBezierHeight(zx0, zx1);
+        const cp1x = zx0;
         const cp1y = link.y0 - h;
-        const cp2x = link.x1;
+        const cp2x = zx1;
         const cp2y = link.y1 - h;
 
         // 마우스 포인트와 곡선 최단거리 계산
         const dist = distanceToBezier(
           mx,
           my,
-          link.x0,
+          zx0,
           link.y0,
           cp1x,
           cp1y,
           cp2x,
           cp2y,
-          link.x1,
+          zx1,
           link.y1
         );
 
@@ -657,6 +724,15 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
     }, 120); // 120ms 디바운스 타임
   };
 
+  // 마우스 드래그 팬(Pan) 조작 결합
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (zoomLevel > 1.0) {
+      setIsDragging(true);
+      dragStartRef.current = { x: e.clientX, y: e.clientY };
+      lastOffsetXRef.current = offsetX;
+    }
+  };
+
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -665,30 +741,24 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    updateActiveLinkAtCoordinates(x, y);
-  };
-
-  // 7. 모바일 터치 이벤트 감지 구현
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas || e.touches.length === 0) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.touches[0].clientX - rect.left;
-    const y = e.touches[0].clientY - rect.top;
-
-    updateActiveLinkAtCoordinates(x, y);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    // 터치 스크롤 방지하여 캔버스 내 조작에 우선권 부여
-    if (e.cancelable) {
-      e.preventDefault();
+    if (isDragging && dragStartRef.current) {
+      const dx = e.clientX - dragStartRef.current.x;
+      const newOffset = lastOffsetXRef.current + dx;
+      setOffsetX(clampOffsetX(newOffset, zoomLevel));
+    } else {
+      updateActiveLinkAtCoordinates(x, y);
     }
-    handleTouchMove(e);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    dragStartRef.current = null;
   };
 
   const handleMouseLeave = () => {
+    setIsDragging(false);
+    dragStartRef.current = null;
+
     mouseRef.current = null;
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -702,10 +772,72 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
     setActiveLink(null);
   };
 
+  // 7. 모바일 터치 이벤트 감지 구현 (드래그 스와이프 팬 및 핀치 줌)
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      lastTouchDistanceRef.current = dist;
+    } else if (e.touches.length === 1 && zoomLevel > 1.0) {
+      if (e.cancelable) e.preventDefault();
+      setIsDragging(true);
+      dragStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      lastOffsetXRef.current = offsetX;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    if (e.touches.length === 2 && lastTouchDistanceRef.current !== null) {
+      e.preventDefault();
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const ratio = dist / lastTouchDistanceRef.current;
+      lastTouchDistanceRef.current = dist;
+
+      const nextZoom = Math.max(1.0, Math.min(10.0, zoomLevel * ratio));
+      if (nextZoom !== zoomLevel) {
+        setZoomLevel(nextZoom);
+        setOffsetX((prev) => clampOffsetX(prev, nextZoom));
+      }
+    } else if (e.touches.length === 1 && isDragging && dragStartRef.current) {
+      if (e.cancelable) e.preventDefault();
+      const dx = e.touches[0].clientX - dragStartRef.current.x;
+      const newOffset = lastOffsetXRef.current + dx;
+      setOffsetX(clampOffsetX(newOffset, zoomLevel));
+    } else if (e.touches.length === 1 && !isDragging) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.touches[0].clientX - rect.left;
+      const y = e.touches[0].clientY - rect.top;
+      updateActiveLinkAtCoordinates(x, y);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    dragStartRef.current = null;
+    lastTouchDistanceRef.current = null;
+  };
+
   // 7-1. 클릭(Click/Tap) 기반 고정(Pin) 상태 바인딩
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // 만약 드래그가 방금 끝났다면 핀 클릭을 무시해 오작동 방지
+    if (dragStartRef.current && Math.abs(e.clientX - dragStartRef.current.x) > 3) {
+      return;
+    }
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -716,22 +848,24 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
     let minDistance = isMobile ? 18 : 10;
 
     filteredLinks.forEach((link) => {
-      const h = getBezierHeight(link.x0, link.x1);
-      const cp1x = link.x0;
+      const zx0 = applyZoom(link.x0);
+      const zx1 = applyZoom(link.x1);
+      const h = getBezierHeight(zx0, zx1);
+      const cp1x = zx0;
       const cp1y = link.y0 - h;
-      const cp2x = link.x1;
+      const cp2x = zx1;
       const cp2y = link.y1 - h;
 
       const dist = distanceToBezier(
         x,
         y,
-        link.x0,
+        zx0,
         link.y0,
         cp1x,
         cp1y,
         cp2x,
         cp2y,
-        link.x1,
+        zx1,
         link.y1
       );
 
@@ -782,18 +916,24 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
       {/* 캔버스 요소 */}
       <canvas
         ref={canvasRef}
+        onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
-        onTouchEnd={handleMouseLeave}
+        onTouchEnd={handleTouchEnd}
         onClick={handleCanvasClick}
-        style={{ width: '100%', height: '100%' }}
-        className="block cursor-pointer w-full h-full"
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          cursor: isDragging ? 'grabbing' : zoomLevel > 1.0 ? 'grab' : 'pointer'
+        }}
+        className="block w-full h-full"
       />
 
       {/* 키보드 탐색 팁 오버레이 (Premium UI 힌트) */}
-      <div className={`absolute bottom-3 left-4 text-[10px] sm:text-xs px-2.5 py-1 rounded-md transition-all duration-300 font-medium ${
+      <div className={`absolute bottom-3 left-4 text-[10px] sm:text-xs px-2.5 py-1 rounded-md transition-all duration-300 font-medium select-none pointer-events-none ${
         isFocused 
           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
           : 'bg-slate-900/40 text-slate-400 border border-slate-800/40'
@@ -806,7 +946,7 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
 
       {/* 검색 집중 탐색 모드 프리미엄 배지 */}
       {searchVerse && (
-        <div className="absolute top-3 left-4 flex items-center gap-2 bg-[#070b16]/85 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-bold shadow-lg backdrop-blur-md transition-all">
+        <div className="absolute top-3 left-4 flex items-center gap-2 bg-[#070b16]/85 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-bold shadow-lg backdrop-blur-md transition-all select-none">
           <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
           🔍 {books[searchVerse.bookIndex].ko} {searchVerse.chapter}:{searchVerse.verse} 집중 탐색 ({searchMatchCount}개 참조)
         </div>
@@ -814,11 +954,53 @@ export const NetworkCanvas: React.FC<NetworkCanvasProps> = ({
 
       {/* LOD 비동기 데이터 로딩 인디케이터 (Premium UI 요소) */}
       {isLoadingDetails && (
-        <div className="absolute top-3 right-4 flex items-center gap-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/35 px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-semibold animate-pulse shadow-lg backdrop-blur-md">
+        <div className="absolute top-3 right-4 flex items-center gap-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/35 px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-semibold animate-pulse shadow-lg backdrop-blur-md select-none">
           <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span>
           세부 참조망 동적 병합 중...
         </div>
       )}
+
+      {/* 프리미엄 플로팅 줌 컨트롤러 패널 */}
+      <div className="absolute bottom-3 right-4 flex items-center gap-1.5 bg-[#070b16]/75 border border-slate-850/80 rounded-xl p-1 px-2 shadow-2xl backdrop-blur-md transition-all select-none">
+        <button
+          onClick={() => {
+            const nextZoom = Math.min(10.0, zoomLevel * 1.25);
+            setZoomLevel(nextZoom);
+            setOffsetX(clampOffsetX(offsetX, nextZoom));
+          }}
+          className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-900/80 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-400 border border-slate-800/80 transition-all font-bold text-sm shadow hover:scale-105 active:scale-95"
+          title="확대"
+        >
+          ＋
+        </button>
+        <button
+          onClick={() => {
+            const nextZoom = Math.max(1.0, zoomLevel / 1.25);
+            setZoomLevel(nextZoom);
+            setOffsetX(clampOffsetX(offsetX, nextZoom));
+          }}
+          className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-900/80 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-400 border border-slate-800/80 transition-all font-bold text-sm shadow hover:scale-105 active:scale-95"
+          title="축소"
+        >
+          －
+        </button>
+        <button
+          onClick={() => {
+            setZoomLevel(1.0);
+            setOffsetX(0);
+          }}
+          className="px-2 h-7 flex items-center justify-center rounded-lg bg-slate-900/80 hover:bg-emerald-500/20 text-[10px] text-slate-400 hover:text-emerald-400 border border-slate-800/80 transition-all font-bold tracking-tighter shadow hover:scale-105 active:scale-95"
+          title="1:1 비율 리셋"
+        >
+          RESET
+        </button>
+        {zoomLevel > 1.0 && (
+          <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded ml-1 transition-all">
+            {zoomLevel.toFixed(1)}x
+          </span>
+        )}
+      </div>
     </div>
   );
 };
+

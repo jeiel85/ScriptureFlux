@@ -130,8 +130,16 @@
 - [x] GitHub Pages 빌드 에셋 404 차단 결함 완치
 - [x] `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` 100% 무오류 빌드 통과 검증 완료
 
+## v0.10.0 - 캔버스 줌(Zoom) & 드래그 팬(Pan) 시스템 대통합 (완료)
+
+- [x] 가로축 줌(1.0x ~ 10.0x) 및 스와이프/드래그 팬 상태 및 Clamping 한계 범위 설계
+- [x] 줌 상태에서도 히트 판정(hit-test) 및 호버/클릭(Pin) 오차가 없도록 좌표 역투영(Unprojection) 연동
+- [x] 마우스 휠 `{ passive: false }` 리스너 우회 바인딩 및 모바일 2손가락 핀치 줌 / 1손가락 드래그 스크롤 스와이프 완비
+- [x] 글래스모프 디자인의 미려한 플로팅 줌 컨트롤러 패널 UI 구현 (`+`, `-`, `RESET` 단추 및 줌 수준 모니터링 배지)
+- [x] `npm run lint` 및 `npm run build` 정적 dist 번들 무오류 통과 검증
+
 ## 후속 아이디어
 
 - [ ] 성경 본문 번역 선택 구조 확장 (예: 쉬운성경, NIV 등)
-- [ ] 모바일 UI 터치 슬라이딩 및 스와이프 제스처 최적화
 - [ ] 데이터 파이프라인에서 invalid tuple 생성 원인 추적 및 report 집계
+

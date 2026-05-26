@@ -1,5 +1,18 @@
 # HISTORY.md
 
+## 2026-05-26 (v0.10.0 - 캔버스 줌(Zoom) & 드래그 팬(Pan) 시스템 대통합)
+
+- 작업: 사용자의 확대 조작 편의 요구를 온전히 수용하여 성경 축 캔버스에 가로 줌(1.0x ~ 10.0x) 및 마우스/터치 드래그 팬(Pan) 시스템을 전면 도입. 줌 스케일 변경에 따른 마우스 호버 및 클릭(Pin) 히트 판정이 어긋나지 않도록 좌표 역투영(Unprojection) 수학 필터를 결합하고, 캔버스 우측 하단에 단계별 줌인/줌아웃 및 1:1 리셋이 가능한 글래스모프 디자인의 프리미엄 플로팅 줌 컨트롤러 패널 UI 구현. 또한 package.json 및 UI 표면의 버전을 v0.10.0으로 일괄 갱신 완수.
+- 변경 파일:
+  - `src/components/NetworkCanvas.tsx`: 가로축 줌(`zoomLevel`), 드래그 팬 오프셋(`offsetX`) 및 Clamping 한계 범위 로직 추가. X 좌표 투영(`applyZoom`) 및 마우스 입력/호버/클릭 좌표 역투영(`invertZoom`) 변환 설계. 마우스 휠 `{ passive: false }` 리스너 우회 및 드래그 핸들러, 모바일 2손가락 핀치 줌 / 1손가락 스와이프 결합. 우측 하단 Glassmorphism 줌 컨트롤 단추 패널 및 배율 모니터 렌더링 결합.
+  - `package.json`, `src/App.tsx`, `README.md`: 제품 버전 및 UI 버전을 v0.10.0 Premium으로 동기화 및 핵심 기능 명세 보강.
+  - `CHANGELOG.md`, `TASKS.md`, `DECISIONS.md`, `HISTORY.md`: 줌 & 팬 시스템 대통합 관련 태스크, 아키텍처 결정 및 버전 이력 최신화 갱신.
+- 검증:
+  - 로컬 `npm.cmd run lint`: ESLint 경고 및 오타 없이 100% 성공 통과.
+  - 로컬 `npm.cmd run typecheck`: TypeScript 형식 안전성 무경고 성공 통과.
+  - 로컬 `npm.cmd run build`: 2.25s 만에 dist/ 정적 dist SPA 컴파일 무결성 통과.
+- 결과: 성공
+
 ## 2026-05-26 (공개 표면 정비 - GitHub Pages, README, 저장소 메타데이터)
 
 - 작업: GitHub Pages, README, 저장소 설명/토픽, 버전 표기 등 공개 사용자에게 보이는 표면을 최신 v0.9.0 상태에 맞게 점검하고 누락된 부분을 보완.
